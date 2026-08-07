@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "Jellyfin.Plugin.SmartFavorites/1.0.0.0": {
+        "runtime": {
+          "Jellyfin.Plugin.SmartFavorites.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Jellyfin.Plugin.SmartFavorites/1.0.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

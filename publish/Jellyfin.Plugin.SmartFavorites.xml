@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Jellyfin.Plugin.SmartFavorites</name>
+    </assembly>
+    <members>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.Configuration.PlaylistSortOrder">
+            <summary>
+            Determines the order in which favorited series contribute their episodes to the playlist.
+            </summary>
+        </member>
+        <member name="F:Jellyfin.Plugin.SmartFavorites.Configuration.PlaylistSortOrder.SeriesName">
+            <summary>
+            Alphabetically by series sort name.
+            </summary>
+        </member>
+        <member name="F:Jellyfin.Plugin.SmartFavorites.Configuration.PlaylistSortOrder.LastWatched">
+            <summary>
+            Series watched most recently come first, series never watched come last.
+            </summary>
+        </member>
+        <member name="F:Jellyfin.Plugin.SmartFavorites.Configuration.PlaylistSortOrder.EpisodeAirDate">
+            <summary>
+            Oldest air date of the next episode first.
+            </summary>
+        </member>
+        <member name="F:Jellyfin.Plugin.SmartFavorites.Configuration.PlaylistSortOrder.Random">
+            <summary>
+            Shuffled on every refresh.
+            </summary>
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration">
+            <summary>
+            Plugin configuration.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration"/> class.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.PlaylistName">
+            <summary>
+            Gets or sets the name of the generated playlist. One playlist with this name is maintained per user.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.EpisodesPerSeries">
+            <summary>
+            Gets or sets how many consecutive unwatched episodes to take from each favorited series.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.IncludeSpecials">
+            <summary>
+            Gets or sets a value indicating whether episodes in season 0 are eligible.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.IncludeUnairedEpisodes">
+            <summary>
+            Gets or sets a value indicating whether episodes whose premiere date is in the future are eligible.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.MakePlaylistPublic">
+            <summary>
+            Gets or sets a value indicating whether the generated playlists are visible to all users.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.SortOrder">
+            <summary>
+            Gets or sets the order in which series contribute their episodes to the playlist.
+            </summary>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Configuration.PluginConfiguration.UserIds">
+            <summary>
+            Gets or sets the users to generate playlists for. An empty list means every user on the server.
+            </summary>
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor">
+            <summary>
+            Rebuilds a user's playlist shortly after they favorite a series or finish an episode,
+            so the playlist does not sit stale until the next scheduled run.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor.#ctor(MediaBrowser.Controller.Library.IUserDataManager,MediaBrowser.Controller.Library.IUserManager,Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder,Microsoft.Extensions.Logging.ILogger{Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor"/> class.
+            </summary>
+            <param name="userDataManager">Instance of the <see cref="T:MediaBrowser.Controller.Library.IUserDataManager"/> interface.</param>
+            <param name="userManager">Instance of the <see cref="T:MediaBrowser.Controller.Library.IUserManager"/> interface.</param>
+            <param name="builder">The playlist builder.</param>
+            <param name="logger">Instance of the <see cref="T:Microsoft.Extensions.Logging.ILogger`1"/> interface.</param>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor.StartAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor.StopAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.FavoriteChangeMonitor.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.Plugin">
+            <summary>
+            Builds smart playlists from the shows a user has marked as favorite.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.Plugin.#ctor(MediaBrowser.Common.Configuration.IApplicationPaths,MediaBrowser.Model.Serialization.IXmlSerializer)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Jellyfin.Plugin.SmartFavorites.Plugin"/> class.
+            </summary>
+            <param name="applicationPaths">Instance of the <see cref="T:MediaBrowser.Common.Configuration.IApplicationPaths"/> interface.</param>
+            <param name="xmlSerializer">Instance of the <see cref="T:MediaBrowser.Model.Serialization.IXmlSerializer"/> interface.</param>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Plugin.Name">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Plugin.Id">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Plugin.Description">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.Plugin.Instance">
+            <summary>
+            Gets the current plugin instance.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.Plugin.GetPages">
+            <inheritdoc />
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.PluginServiceRegistrator">
+            <summary>
+            Registers the plugin's services with the host.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.PluginServiceRegistrator.RegisterServices(Microsoft.Extensions.DependencyInjection.IServiceCollection,MediaBrowser.Controller.IServerApplicationHost)">
+            <inheritdoc />
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask">
+            <summary>
+            Rebuilds every user's favorites playlist.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.#ctor(Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder)">
+            <summary>
+            Initializes a new instance of the <see cref="T:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask"/> class.
+            </summary>
+            <param name="builder">The playlist builder.</param>
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.Name">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.Key">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.Description">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.Category">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.IsHidden">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.IsEnabled">
+            <inheritdoc />
+        </member>
+        <member name="P:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.IsLogged">
+            <inheritdoc />
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.ExecuteAsync(System.IProgress{System.Double},System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.ScheduledTasks.RefreshFavoritesPlaylistTask.GetDefaultTriggers">
+            <inheritdoc />
+        </member>
+        <member name="T:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder">
+            <summary>
+            Rebuilds the "up next" playlist for a user from the series they have favorited.
+            </summary>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder.#ctor(MediaBrowser.Controller.Library.ILibraryManager,MediaBrowser.Controller.Library.IUserManager,MediaBrowser.Controller.Library.IUserDataManager,MediaBrowser.Controller.Playlists.IPlaylistManager,Microsoft.Extensions.Logging.ILogger{Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder"/> class.
+            </summary>
+            <param name="libraryManager">Instance of the <see cref="T:MediaBrowser.Controller.Library.ILibraryManager"/> interface.</param>
+            <param name="userManager">Instance of the <see cref="T:MediaBrowser.Controller.Library.IUserManager"/> interface.</param>
+            <param name="userDataManager">Instance of the <see cref="T:MediaBrowser.Controller.Library.IUserDataManager"/> interface.</param>
+            <param name="playlistManager">Instance of the <see cref="T:MediaBrowser.Controller.Playlists.IPlaylistManager"/> interface.</param>
+            <param name="logger">Instance of the <see cref="T:Microsoft.Extensions.Logging.ILogger`1"/> interface.</param>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder.GetTargetUsers">
+            <summary>
+            Gets the users the plugin is configured to maintain a playlist for.
+            </summary>
+            <returns>The users to build playlists for.</returns>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder.BuildForAllUsersAsync(System.IProgress{System.Double},System.Threading.CancellationToken)">
+            <summary>
+            Rebuilds the playlist for every configured user.
+            </summary>
+            <param name="progress">Progress reporter.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A <see cref="T:System.Threading.Tasks.Task"/> representing the asynchronous operation.</returns>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder.BuildForUserAsync(Jellyfin.Database.Implementations.Entities.User,System.Threading.CancellationToken)">
+            <summary>
+            Rebuilds the playlist for a single user.
+            </summary>
+            <param name="user">The user.</param>
+            <param name="cancellationToken">The cancellation token.</param>
+            <returns>A <see cref="T:System.Threading.Tasks.Task"/> representing the asynchronous operation.</returns>
+        </member>
+        <member name="M:Jellyfin.Plugin.SmartFavorites.SmartFavoritesPlaylistBuilder.Dispose">
+            <inheritdoc />
+        </member>
+    </members>
+</doc>
