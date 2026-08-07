@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# This workflow only reads the repo. Fork PRs get a read-only token regardless,
+# but pin it so pushes to this repo don't hand it write access either.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

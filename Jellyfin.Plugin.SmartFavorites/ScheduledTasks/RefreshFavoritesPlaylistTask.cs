@@ -48,6 +48,11 @@ public class RefreshFavoritesPlaylistTask : IScheduledTask, IConfigurableSchedul
         => _builder.BuildForAllUsersAsync(progress, cancellationToken);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Favorites, playback and library changes are picked up live by
+    /// <see cref="PlaylistRefreshMonitor"/>; these triggers only cover events missed
+    /// while the server was down.
+    /// </remarks>
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
         yield return new TaskTriggerInfo
@@ -58,7 +63,7 @@ public class RefreshFavoritesPlaylistTask : IScheduledTask, IConfigurableSchedul
         yield return new TaskTriggerInfo
         {
             Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = TimeSpan.FromHours(6).Ticks
+            IntervalTicks = TimeSpan.FromHours(24).Ticks
         };
     }
 }

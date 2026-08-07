@@ -16,10 +16,16 @@ Series with nothing left unwatched are skipped, so the playlist is only ever a l
 
 ## When it refreshes
 
-- On server start.
-- Every 6 hours.
-- About 15 seconds after you favorite/unfavorite a show, finish an episode, or toggle an episode's watched state.
-- On demand, via **Refresh playlists now** on the plugin's config page, or **Dashboard → Scheduled Tasks → Refresh favorites playlist**.
+Refreshes are event-driven. About 15 seconds after any of these, the affected user's playlist is rebuilt:
+
+- A series is favorited or unfavorited.
+- An episode is finished, or its watched state is toggled.
+- An episode is added to or removed from the library (a scan that adds a new season, for example).
+- The plugin's configuration is saved.
+
+Events arriving in bursts are collapsed into a single rebuild, and a rebuild is forced after 5 minutes so a long library scan can't defer one indefinitely.
+
+The scheduled task is only a backstop for changes made while the server was down. It runs on start and once every 24 hours, and can be run on demand via **Refresh playlists now** on the config page or **Dashboard → Scheduled Tasks → Refresh favorites playlist**.
 
 ## Settings
 

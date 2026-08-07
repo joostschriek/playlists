@@ -13,6 +13,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<SmartFavoritesPlaylistBuilder>();
-        serviceCollection.AddHostedService<FavoriteChangeMonitor>();
+        serviceCollection.AddHostedService<PlaylistRefreshMonitor>();
     }
 }
