@@ -45,13 +45,38 @@ dotnet publish Jellyfin.Plugin.SmartFavorites/Jellyfin.Plugin.SmartFavorites.csp
 
 ## Installing
 
-Copy `publish/Jellyfin.Plugin.SmartFavorites.dll` into a new folder under your Jellyfin plugin directory:
+### From the plugin repository (recommended)
+
+In Jellyfin: **Dashboard → Plugins → Repositories → +**, then add:
+
+| Field | Value |
+| --- | --- |
+| Repository Name | `Smart Favorites` |
+| Repository URL | `https://raw.githubusercontent.com/joostschriek/playlists/master/manifest.json` |
+
+Then **Dashboard → Plugins → Catalog → Smart Favorites → Install**, and restart Jellyfin. Updates show up in the catalog automatically.
+
+### Manually
+
+Copy `publish/Jellyfin.Plugin.SmartFavorites.dll` into a new folder under your Jellyfin plugin directory, named `<PluginName>_<Version>`:
 
 ```
-<jellyfin-config>/plugins/SmartFavorites_1.0.0.0/Jellyfin.Plugin.SmartFavorites.dll
+<jellyfin-config>/plugins/Smart Favorites_1.0.0.0/Jellyfin.Plugin.SmartFavorites.dll
 ```
 
 Restart Jellyfin. The plugin appears under **Dashboard → Plugins → Smart Favorites**.
+
+## Releasing
+
+Releases are cut by CI, which is the only thing that writes checksums into `manifest.json`:
+
+```sh
+git tag v1.0.1.0 && git push origin v1.0.1.0
+```
+
+The `release` workflow builds the plugin at that version, zips the DLL (flat, as Jellyfin expects), publishes a GitHub release with the zip attached, records the zip's MD5 in `manifest.json`, and commits that back to `master`. You can also run it from the Actions tab via **Run workflow** if you'd rather not tag.
+
+This requires **Settings → Actions → General → Workflow permissions → Read and write permissions** on the repo, otherwise the manifest commit is rejected.
 
 ## Notes
 

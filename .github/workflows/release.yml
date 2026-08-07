@@ -1,0 +1,104 @@
+name: release
+
+# Builds the plugin, publishes a GitHub release with the zip Jellyfin downloads,
+# then records the zip's MD5 in manifest.json so the plugin repository serves it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.0.1'
+        required: true
+      changelog:
+        description: 'Changelog text for this version'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Resolve version and ABI
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            CHANGELOG="${{ inputs.changelog }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            CHANGELOG="Release ${GITHUB_REF_NAME}"
+          fi
+          # Single source of truth for the minimum supported Jellyfin version.
+          TARGET_ABI="$(grep '^targetAbi:' build.yaml | cut -d'"' -f2)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "changelog=$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "target_abi=$TARGET_ABI" >> "$GITHUB_OUTPUT"
+          echo "Releasing $VERSION against Jellyfin >= $TARGET_ABI"
+
+      - name: Build
+        run: |
+          dotnet publish Jellyfin.Plugin.SmartFavorites/Jellyfin.Plugin.SmartFavorites.csproj \
+            -c Release -o publish \
+            -p:Version=${{ steps.meta.outputs.version }} \
+            -p:AssemblyVersion=${{ steps.meta.outputs.version }} \
+            -p:FileVersion=${{ steps.meta.outputs.version }}
+
+      - name: Package
+        id: package
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          ZIP="smart-favorites_${VERSION}.zip"
+          mkdir -p artifacts
+          # Jellyfin extracts the archive flat, so the DLL must sit at the zip root.
+          (cd publish && zip -X "../artifacts/${ZIP}" Jellyfin.Plugin.SmartFavorites.dll)
+          echo "zip=artifacts/${ZIP}" >> "$GITHUB_OUTPUT"
+          echo "name=${ZIP}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          gh release create "v${VERSION}" "${{ steps.package.outputs.zip }}" \
+            --title "v${VERSION}" \
+            --notes "${{ steps.meta.outputs.changelog }}" \
+            || gh release upload "v${VERSION}" "${{ steps.package.outputs.zip }}" --clobber
+
+      - name: Update manifest
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.meta.outputs.version }}"
+          python3 scripts/update_manifest.py \
+            --version "${VERSION}" \
+            --zip "${{ steps.package.outputs.zip }}" \
+            --source-url "${{ github.server_url }}/${{ github.repository }}/releases/download/v${VERSION}/${{ steps.package.outputs.name }}" \
+            --target-abi "${{ steps.meta.outputs.target_abi }}" \
+            --changelog "${{ steps.meta.outputs.changelog }}"
+
+      - name: Commit manifest
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet manifest.json; then
+            echo "manifest.json unchanged"
+            exit 0
+          fi
+          git add manifest.json
+          git commit -m "Publish ${{ steps.meta.outputs.version }} to the plugin manifest"
+          git push origin HEAD:master

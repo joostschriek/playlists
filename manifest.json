@@ -1,0 +1,11 @@
+[
+  {
+    "guid": "2df830fd-e973-4ac9-a087-1bf88e98f60d",
+    "name": "Smart Favorites",
+    "overview": "Smart playlists built from the shows you have favorited",
+    "description": "Keeps a per-user playlist of the next unwatched episodes from every series marked as a favorite. Refreshes on server start, on a schedule, and shortly after a favorite is toggled or an episode is finished.",
+    "owner": "joostschriek",
+    "category": "General",
+    "versions": []
+  }
+]
