@@ -6,6 +6,15 @@
     "description": "Keeps a per-user playlist of the next unwatched episodes from every series marked as a favorite. Refreshes on server start, on a schedule, and shortly after a favorite is toggled or an episode is finished.",
     "owner": "joostschriek",
     "category": "General",
-    "versions": []
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v1.0.0.0/smart-favorites_1.0.0.0.zip",
+        "checksum": "d5d68e36a9befb277b95eb74f7cbdab6",
+        "timestamp": "2026-08-07T15:18:27Z"
+      }
+    ]
   }
 ]
