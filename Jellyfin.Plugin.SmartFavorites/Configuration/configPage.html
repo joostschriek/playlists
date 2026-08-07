@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Smart Favorites</title>
+</head>
+<body>
+    <div id="SmartFavoritesConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="SmartFavoritesConfigForm">
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="PlaylistName">Playlist name</label>
+                        <input id="PlaylistName" name="PlaylistName" type="text" is="emby-input" />
+                        <div class="fieldDescription">One playlist with this name is created and kept in sync for each user.</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="EpisodesPerSeries">Episodes per series</label>
+                        <input id="EpisodesPerSeries" name="EpisodesPerSeries" type="number" is="emby-input" min="1" max="50" />
+                        <div class="fieldDescription">How many consecutive unwatched episodes to take from each favorited series.</div>
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="SortOrder">Order series by</label>
+                        <select is="emby-select" id="SortOrder" name="SortOrder" class="emby-select-withcolor emby-select">
+                            <option value="LastWatched">Recently watched first</option>
+                            <option value="SeriesName">Series name</option>
+                            <option value="EpisodeAirDate">Episode air date</option>
+                            <option value="Random">Random</option>
+                        </select>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="IncludeSpecials" name="IncludeSpecials" type="checkbox" is="emby-checkbox" />
+                            <span>Include specials</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Allow episodes in season 0 into the playlist.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="IncludeUnairedEpisodes" name="IncludeUnairedEpisodes" type="checkbox" is="emby-checkbox" />
+                            <span>Include unaired episodes</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Allow episodes whose premiere date is still in the future.</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="MakePlaylistPublic" name="MakePlaylistPublic" type="checkbox" is="emby-checkbox" />
+                            <span>Make playlists public</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Public playlists are visible to every user on the server.</div>
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="UserIds">Users</label>
+                        <select is="emby-select" id="UserIds" name="UserIds" multiple class="emby-select-withcolor emby-select"></select>
+                        <div class="fieldDescription">Select none to build a playlist for every user.</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+
+                <br />
+                <button is="emby-button" type="button" id="RefreshNow" class="raised block emby-button">
+                    <span>Refresh playlists now</span>
+                </button>
+                <div class="fieldDescription">Playlists also refresh on server start, every 6 hours, and shortly after you favorite a show or finish an episode.</div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var SmartFavoritesConfig = {
+                pluginUniqueId: '2df830fd-e973-4ac9-a087-1bf88e98f60d',
+                taskKey: 'SmartFavoritesRefresh'
+            };
+
+            function loadConfig(page) {
+                return Promise.all([
+                    ApiClient.getPluginConfiguration(SmartFavoritesConfig.pluginUniqueId),
+                    ApiClient.getUsers()
+                ]).then(function (responses) {
+                    var config = responses[0];
+                    var users = responses[1];
+
+                    page.querySelector('#PlaylistName').value = config.PlaylistName;
+                    page.querySelector('#EpisodesPerSeries').value = config.EpisodesPerSeries;
+                    page.querySelector('#SortOrder').value = config.SortOrder;
+                    page.querySelector('#IncludeSpecials').checked = config.IncludeSpecials;
+                    page.querySelector('#IncludeUnairedEpisodes').checked = config.IncludeUnairedEpisodes;
+                    page.querySelector('#MakePlaylistPublic').checked = config.MakePlaylistPublic;
+
+                    var selected = config.UserIds || [];
+                    var select = page.querySelector('#UserIds');
+                    select.innerHTML = users.map(function (user) {
+                        var isSelected = selected.some(function (id) {
+                            return id.replace(/-/g, '').toLowerCase() === user.Id.replace(/-/g, '').toLowerCase();
+                        });
+                        var option = document.createElement('option');
+                        option.value = user.Id;
+                        option.textContent = user.Name;
+                        option.selected = isSelected;
+                        return option.outerHTML;
+                    }).join('');
+                });
+            }
+
+            document.querySelector('#SmartFavoritesConfigPage')
+                .addEventListener('pageshow', function () {
+                    var page = this;
+                    Dashboard.showLoadingMsg();
+                    loadConfig(page).then(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#SmartFavoritesConfigForm')
+                .addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var page = document.querySelector('#SmartFavoritesConfigPage');
+                    Dashboard.showLoadingMsg();
+
+                    ApiClient.getPluginConfiguration(SmartFavoritesConfig.pluginUniqueId).then(function (config) {
+                        config.PlaylistName = page.querySelector('#PlaylistName').value;
+                        config.EpisodesPerSeries = parseInt(page.querySelector('#EpisodesPerSeries').value, 10) || 1;
+                        config.SortOrder = page.querySelector('#SortOrder').value;
+                        config.IncludeSpecials = page.querySelector('#IncludeSpecials').checked;
+                        config.IncludeUnairedEpisodes = page.querySelector('#IncludeUnairedEpisodes').checked;
+                        config.MakePlaylistPublic = page.querySelector('#MakePlaylistPublic').checked;
+                        config.UserIds = Array.prototype.map.call(
+                            page.querySelectorAll('#UserIds option:checked'),
+                            function (option) { return option.value; });
+
+                        ApiClient.updatePluginConfiguration(SmartFavoritesConfig.pluginUniqueId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+
+                    return false;
+                });
+
+            document.querySelector('#RefreshNow')
+                .addEventListener('click', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getScheduledTasks().then(function (tasks) {
+                        var task = tasks.filter(function (t) { return t.Key === SmartFavoritesConfig.taskKey; })[0];
+                        if (!task) {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert('Could not find the Smart Favorites refresh task.');
+                            return;
+                        }
+
+                        ApiClient.startScheduledTask(task.Id).then(function () {
+                            Dashboard.hideLoadingMsg();
+                            Dashboard.alert('Refreshing playlists in the background.');
+                        });
+                    });
+                });
+        </script>
+    </div>
+</body>
+</html>

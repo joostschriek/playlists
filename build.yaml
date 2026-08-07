@@ -1,0 +1,17 @@
+---
+name: "Smart Favorites"
+guid: "2df830fd-e973-4ac9-a087-1bf88e98f60d"
+version: "1.0.0.0"
+targetAbi: "10.11.0.0"
+framework: "net9.0"
+overview: "Smart playlists built from the shows you have favorited"
+description: >
+  Keeps a per-user playlist of the next unwatched episodes from every series
+  marked as a favorite. Refreshes on server start, on a schedule, and shortly
+  after a favorite is toggled or an episode is finished.
+category: "General"
+owner: "joostschriek"
+artifacts:
+- "Jellyfin.Plugin.SmartFavorites.dll"
+changelog: >
+  Initial release.

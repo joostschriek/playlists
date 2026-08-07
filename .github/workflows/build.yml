@@ -1,0 +1,27 @@
+name: build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Build
+        run: dotnet build Jellyfin.Plugin.SmartFavorites/Jellyfin.Plugin.SmartFavorites.csproj -c Release
+
+      - name: Publish
+        run: dotnet publish Jellyfin.Plugin.SmartFavorites/Jellyfin.Plugin.SmartFavorites.csproj -c Release -o publish
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jellyfin.Plugin.SmartFavorites
+          path: publish/Jellyfin.Plugin.SmartFavorites.dll
