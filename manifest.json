@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.1.0.0",
+        "changelog": "Rule-based playlist filters. Define any number of playlists, each matching series on favorited status, genre, studio, tag, name, content rating, series status, community/critic rating, year, days since added, or days since last watched. Existing configurations migrate automatically.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v1.1.0.0/smart-favorites_1.1.0.0.zip",
+        "checksum": "616c2dcdb8b733f2890fbeebeee35a18",
+        "timestamp": "2026-08-08T08:39:24Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "Refresh on library additions/removals and configuration changes, not just user data. Scheduled task drops to a 24h backstop.",
         "targetAbi": "10.11.0.0",
