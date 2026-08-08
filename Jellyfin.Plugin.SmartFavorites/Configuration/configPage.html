@@ -8,161 +8,435 @@
     <div id="SmartFavoritesConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
-                <form id="SmartFavoritesConfigForm">
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="PlaylistName">Playlist name</label>
-                        <input id="PlaylistName" name="PlaylistName" type="text" is="emby-input" />
-                        <div class="fieldDescription">One playlist with this name is created and kept in sync for each user.</div>
-                    </div>
+                <p>
+                    Each playlist below is generated from the series that satisfy its rules. For every
+                    matching series the next unwatched episodes are added, and the playlist is rebuilt
+                    whenever your favorites, watch state or library change.
+                </p>
 
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="EpisodesPerSeries">Episodes per series</label>
-                        <input id="EpisodesPerSeries" name="EpisodesPerSeries" type="number" is="emby-input" min="1" max="50" />
-                        <div class="fieldDescription">How many consecutive unwatched episodes to take from each favorited series.</div>
-                    </div>
+                <div id="Playlists"></div>
 
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="SortOrder">Order series by</label>
-                        <select is="emby-select" id="SortOrder" name="SortOrder" class="emby-select-withcolor emby-select">
-                            <option value="LastWatched">Recently watched first</option>
-                            <option value="SeriesName">Series name</option>
-                            <option value="EpisodeAirDate">Episode air date</option>
-                            <option value="Random">Random</option>
-                        </select>
-                    </div>
+                <button is="emby-button" type="button" id="AddPlaylist" class="raised block emby-button">
+                    <span>Add playlist</span>
+                </button>
 
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label class="emby-checkbox-label">
-                            <input id="IncludeSpecials" name="IncludeSpecials" type="checkbox" is="emby-checkbox" />
-                            <span>Include specials</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">Allow episodes in season 0 into the playlist.</div>
+                <br />
+                <div class="selectContainer">
+                    <label class="selectLabel" for="GlobalUserIds">Users</label>
+                    <select is="emby-select" id="GlobalUserIds" multiple class="emby-select-withcolor emby-select"></select>
+                    <div class="fieldDescription">
+                        Users the plugin covers at all. Select none for every user on the server.
+                        Individual playlists can narrow this further.
                     </div>
+                </div>
 
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label class="emby-checkbox-label">
-                            <input id="IncludeUnairedEpisodes" name="IncludeUnairedEpisodes" type="checkbox" is="emby-checkbox" />
-                            <span>Include unaired episodes</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">Allow episodes whose premiere date is still in the future.</div>
-                    </div>
-
-                    <div class="checkboxContainer checkboxContainer-withDescription">
-                        <label class="emby-checkbox-label">
-                            <input id="MakePlaylistPublic" name="MakePlaylistPublic" type="checkbox" is="emby-checkbox" />
-                            <span>Make playlists public</span>
-                        </label>
-                        <div class="fieldDescription checkboxFieldDescription">Public playlists are visible to every user on the server.</div>
-                    </div>
-
-                    <div class="selectContainer">
-                        <label class="selectLabel" for="UserIds">Users</label>
-                        <select is="emby-select" id="UserIds" name="UserIds" multiple class="emby-select-withcolor emby-select"></select>
-                        <div class="fieldDescription">Select none to build a playlist for every user.</div>
-                    </div>
-
-                    <div>
-                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                            <span>Save</span>
-                        </button>
-                    </div>
-                </form>
+                <button is="emby-button" type="button" id="Save" class="raised button-submit block emby-button">
+                    <span>Save</span>
+                </button>
 
                 <br />
                 <button is="emby-button" type="button" id="RefreshNow" class="raised block emby-button">
                     <span>Refresh playlists now</span>
                 </button>
-                <div class="fieldDescription">Playlists also refresh on server start, every 6 hours, and shortly after you favorite a show or finish an episode.</div>
+                <div class="fieldDescription">
+                    Playlists refresh automatically within about 15 seconds of a relevant change. Use this
+                    after editing rules if you do not want to wait, or to rebuild after server downtime.
+                </div>
             </div>
         </div>
 
         <script type="text/javascript">
-            var SmartFavoritesConfig = {
-                pluginUniqueId: '2df830fd-e973-4ac9-a087-1bf88e98f60d',
-                taskKey: 'SmartFavoritesRefresh'
-            };
+            (function () {
+                var PLUGIN_ID = '2df830fd-e973-4ac9-a087-1bf88e98f60d';
+                var TASK_KEY = 'SmartFavoritesRefresh';
 
-            function loadConfig(page) {
-                return Promise.all([
-                    ApiClient.getPluginConfiguration(SmartFavoritesConfig.pluginUniqueId),
-                    ApiClient.getUsers()
-                ]).then(function (responses) {
-                    var config = responses[0];
-                    var users = responses[1];
+                var FIELDS = [
+                    { value: 'IsFavorite', label: 'Favorited', type: 'bool' },
+                    { value: 'Genre', label: 'Genre', type: 'text' },
+                    { value: 'Studio', label: 'Studio', type: 'text' },
+                    { value: 'Tag', label: 'Tag', type: 'text' },
+                    { value: 'Name', label: 'Series name', type: 'text' },
+                    { value: 'OfficialRating', label: 'Content rating', type: 'text' },
+                    { value: 'SeriesStatus', label: 'Status', type: 'status' },
+                    { value: 'CommunityRating', label: 'Community rating', type: 'number' },
+                    { value: 'CriticRating', label: 'Critic rating', type: 'number' },
+                    { value: 'ProductionYear', label: 'Year', type: 'number' },
+                    { value: 'DaysSinceAdded', label: 'Days since added', type: 'number' },
+                    { value: 'DaysSinceLastWatched', label: 'Days since last watched', type: 'number' }
+                ];
 
-                    page.querySelector('#PlaylistName').value = config.PlaylistName;
-                    page.querySelector('#EpisodesPerSeries').value = config.EpisodesPerSeries;
-                    page.querySelector('#SortOrder').value = config.SortOrder;
-                    page.querySelector('#IncludeSpecials').checked = config.IncludeSpecials;
-                    page.querySelector('#IncludeUnairedEpisodes').checked = config.IncludeUnairedEpisodes;
-                    page.querySelector('#MakePlaylistPublic').checked = config.MakePlaylistPublic;
+                var TEXT_OPERATORS = ['Is', 'IsNot', 'Contains', 'DoesNotContain'];
+                var NUMBER_OPERATORS = ['Is', 'IsNot', 'GreaterThan', 'LessThan'];
+                var BOOL_OPERATORS = ['Is', 'IsNot'];
 
-                    var selected = config.UserIds || [];
-                    var select = page.querySelector('#UserIds');
-                    select.innerHTML = users.map(function (user) {
-                        var isSelected = selected.some(function (id) {
-                            return id.replace(/-/g, '').toLowerCase() === user.Id.replace(/-/g, '').toLowerCase();
-                        });
-                        var option = document.createElement('option');
-                        option.value = user.Id;
-                        option.textContent = user.Name;
-                        option.selected = isSelected;
-                        return option.outerHTML;
+                var OPERATOR_LABELS = {
+                    Is: 'is',
+                    IsNot: 'is not',
+                    Contains: 'contains',
+                    DoesNotContain: 'does not contain',
+                    GreaterThan: 'is greater than',
+                    LessThan: 'is less than'
+                };
+
+                var SORT_ORDERS = [
+                    { value: 'LastWatched', label: 'Recently watched first' },
+                    { value: 'SeriesName', label: 'Series name' },
+                    { value: 'EpisodeAirDate', label: 'Episode air date' },
+                    { value: 'RecentlyAdded', label: 'Recently added first' },
+                    { value: 'CommunityRating', label: 'Highest rated first' },
+                    { value: 'Random', label: 'Random' }
+                ];
+
+                var state = { config: null, users: [] };
+
+                function esc(value) {
+                    return String(value == null ? '' : value)
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                }
+
+                function fieldType(fieldValue) {
+                    for (var i = 0; i < FIELDS.length; i++) {
+                        if (FIELDS[i].value === fieldValue) {
+                            return FIELDS[i].type;
+                        }
+                    }
+                    return 'text';
+                }
+
+                function operatorsFor(type) {
+                    if (type === 'number') {
+                        return NUMBER_OPERATORS;
+                    }
+                    if (type === 'bool') {
+                        return BOOL_OPERATORS;
+                    }
+                    return TEXT_OPERATORS;
+                }
+
+                function options(values, selected, labelFor) {
+                    return values.map(function (value) {
+                        var label = labelFor ? labelFor(value) : value;
+                        return '<option value="' + esc(value) + '"' +
+                            (value === selected ? ' selected' : '') + '>' + esc(label) + '</option>';
                     }).join('');
-                });
-            }
+                }
 
-            document.querySelector('#SmartFavoritesConfigPage')
-                .addEventListener('pageshow', function () {
-                    var page = this;
+                function userOptions(selectedIds) {
+                    var selected = (selectedIds || []).map(function (id) {
+                        return String(id).replace(/-/g, '').toLowerCase();
+                    });
+                    return state.users.map(function (user) {
+                        var normalized = user.Id.replace(/-/g, '').toLowerCase();
+                        return '<option value="' + esc(user.Id) + '"' +
+                            (selected.indexOf(normalized) !== -1 ? ' selected' : '') + '>' +
+                            esc(user.Name) + '</option>';
+                    }).join('');
+                }
+
+                function valueControl(rule, playlistIndex, ruleIndex) {
+                    var type = fieldType(rule.Field);
+                    var name = 'data-playlist="' + playlistIndex + '" data-rule="' + ruleIndex + '" class="ruleValue"';
+
+                    if (type === 'bool') {
+                        return '<select is="emby-select" ' + name + '>' +
+                            options(['true', 'false'], String(rule.Value).toLowerCase(),
+                                function (v) { return v === 'true' ? 'yes' : 'no'; }) +
+                            '</select>';
+                    }
+                    if (type === 'status') {
+                        return '<select is="emby-select" ' + name + '>' +
+                            options(['Continuing', 'Ended', 'Unreleased'], rule.Value) +
+                            '</select>';
+                    }
+                    return '<input is="emby-input" type="' + (type === 'number' ? 'number' : 'text') +
+                        '" step="any" ' + name + ' value="' + esc(rule.Value) + '" />';
+                }
+
+                function renderRule(rule, playlistIndex, ruleIndex) {
+                    var type = fieldType(rule.Field);
+                    var validOperators = operatorsFor(type);
+                    var operator = validOperators.indexOf(rule.Operator) === -1 ? validOperators[0] : rule.Operator;
+
+                    return '<div style="display:flex;gap:0.5em;align-items:flex-end;margin-bottom:0.5em;flex-wrap:wrap;">' +
+                        '<div style="flex:2 1 10em;"><select is="emby-select" class="ruleField" ' +
+                            'data-playlist="' + playlistIndex + '" data-rule="' + ruleIndex + '">' +
+                            options(FIELDS.map(function (f) { return f.value; }), rule.Field, function (v) {
+                                for (var i = 0; i < FIELDS.length; i++) {
+                                    if (FIELDS[i].value === v) { return FIELDS[i].label; }
+                                }
+                                return v;
+                            }) +
+                        '</select></div>' +
+                        '<div style="flex:2 1 10em;"><select is="emby-select" class="ruleOperator" ' +
+                            'data-playlist="' + playlistIndex + '" data-rule="' + ruleIndex + '">' +
+                            options(validOperators, operator, function (v) { return OPERATOR_LABELS[v] || v; }) +
+                        '</select></div>' +
+                        '<div style="flex:2 1 10em;">' + valueControl(rule, playlistIndex, ruleIndex) + '</div>' +
+                        '<button is="emby-button" type="button" class="raised removeRule" ' +
+                            'data-playlist="' + playlistIndex + '" data-rule="' + ruleIndex + '">' +
+                            '<span>Remove</span></button>' +
+                        '</div>';
+                }
+
+                function renderPlaylist(playlist, index) {
+                    var rules = playlist.Rules || [];
+                    var rulesHtml = rules.length
+                        ? rules.map(function (rule, i) { return renderRule(rule, index, i); }).join('')
+                        : '<div class="fieldDescription" style="margin-bottom:0.5em;">' +
+                          'No rules: every series in the library qualifies.</div>';
+
+                    return '<fieldset class="verticalSection" style="border:1px solid rgba(128,128,128,0.4);' +
+                        'border-radius:4px;padding:1em;margin-bottom:1.5em;">' +
+                        '<legend style="padding:0 0.5em;">' + esc(playlist.Name || 'Untitled') + '</legend>' +
+
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Playlist name</label>' +
+                            '<input is="emby-input" type="text" class="playlistName" data-playlist="' + index + '" ' +
+                                'value="' + esc(playlist.Name) + '" />' +
+                        '</div>' +
+
+                        '<div class="checkboxContainer">' +
+                            '<label class="emby-checkbox-label">' +
+                                '<input is="emby-checkbox" type="checkbox" class="playlistEnabled" data-playlist="' + index + '"' +
+                                    (playlist.Enabled ? ' checked' : '') + ' />' +
+                                '<span>Enabled</span>' +
+                            '</label>' +
+                        '</div>' +
+
+                        '<div class="selectContainer">' +
+                            '<label class="selectLabel">Match</label>' +
+                            '<select is="emby-select" class="playlistMatch" data-playlist="' + index + '">' +
+                                options(['All', 'Any'], playlist.Match, function (v) {
+                                    return v === 'All' ? 'All rules must match' : 'Any rule may match';
+                                }) +
+                            '</select>' +
+                        '</div>' +
+
+                        '<h3 style="margin-bottom:0.5em;">Rules</h3>' +
+                        rulesHtml +
+                        '<button is="emby-button" type="button" class="raised addRule" data-playlist="' + index + '">' +
+                            '<span>Add rule</span></button>' +
+
+                        '<h3 style="margin:1em 0 0.5em;">Episodes</h3>' +
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Episodes per series</label>' +
+                            '<input is="emby-input" type="number" min="1" max="50" class="playlistEpisodes" ' +
+                                'data-playlist="' + index + '" value="' + esc(playlist.EpisodesPerSeries) + '" />' +
+                            '<div class="fieldDescription">How many consecutive unwatched episodes to take from each matching series.</div>' +
+                        '</div>' +
+
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Maximum episodes</label>' +
+                            '<input is="emby-input" type="number" min="0" max="5000" class="playlistMax" ' +
+                                'data-playlist="' + index + '" value="' + esc(playlist.MaxItems) + '" />' +
+                            '<div class="fieldDescription">Total cap on the playlist. 0 means no limit.</div>' +
+                        '</div>' +
+
+                        '<div class="selectContainer">' +
+                            '<label class="selectLabel">Order series by</label>' +
+                            '<select is="emby-select" class="playlistSort" data-playlist="' + index + '">' +
+                                options(SORT_ORDERS.map(function (s) { return s.value; }), playlist.SortOrder, function (v) {
+                                    for (var i = 0; i < SORT_ORDERS.length; i++) {
+                                        if (SORT_ORDERS[i].value === v) { return SORT_ORDERS[i].label; }
+                                    }
+                                    return v;
+                                }) +
+                            '</select>' +
+                        '</div>' +
+
+                        '<div class="checkboxContainer">' +
+                            '<label class="emby-checkbox-label">' +
+                                '<input is="emby-checkbox" type="checkbox" class="playlistSpecials" data-playlist="' + index + '"' +
+                                    (playlist.IncludeSpecials ? ' checked' : '') + ' />' +
+                                '<span>Include specials</span>' +
+                            '</label>' +
+                        '</div>' +
+
+                        '<div class="checkboxContainer">' +
+                            '<label class="emby-checkbox-label">' +
+                                '<input is="emby-checkbox" type="checkbox" class="playlistUnaired" data-playlist="' + index + '"' +
+                                    (playlist.IncludeUnairedEpisodes ? ' checked' : '') + ' />' +
+                                '<span>Include unaired episodes</span>' +
+                            '</label>' +
+                        '</div>' +
+
+                        '<div class="checkboxContainer">' +
+                            '<label class="emby-checkbox-label">' +
+                                '<input is="emby-checkbox" type="checkbox" class="playlistPublic" data-playlist="' + index + '"' +
+                                    (playlist.MakePublic ? ' checked' : '') + ' />' +
+                                '<span>Visible to all users</span>' +
+                            '</label>' +
+                        '</div>' +
+
+                        '<div class="selectContainer">' +
+                            '<label class="selectLabel">Build for</label>' +
+                            '<select is="emby-select" multiple class="playlistUsers" data-playlist="' + index + '">' +
+                                userOptions(playlist.UserIds) +
+                            '</select>' +
+                            '<div class="fieldDescription">Select none to use the server-wide user list below.</div>' +
+                        '</div>' +
+
+                        '<button is="emby-button" type="button" class="raised removePlaylist" data-playlist="' + index + '">' +
+                            '<span>Delete this playlist</span></button>' +
+                        '</fieldset>';
+                }
+
+                function render() {
+                    var page = document.querySelector('#SmartFavoritesConfigPage');
+                    page.querySelector('#Playlists').innerHTML =
+                        state.config.Playlists.map(renderPlaylist).join('');
+                    page.querySelector('#GlobalUserIds').innerHTML = userOptions(state.config.UserIds);
+                    bind(page);
+                }
+
+                function selectedValues(select) {
+                    return Array.prototype.filter.call(select.options, function (o) { return o.selected; })
+                        .map(function (o) { return o.value; });
+                }
+
+                /**
+                 * Reads the rendered form back into state before any structural change, so
+                 * edits are not lost when the list is re-rendered.
+                 */
+                function syncFromDom() {
+                    var page = document.querySelector('#SmartFavoritesConfigPage');
+
+                    function each(selector, apply) {
+                        Array.prototype.forEach.call(page.querySelectorAll(selector), function (el) {
+                            var playlist = state.config.Playlists[parseInt(el.getAttribute('data-playlist'), 10)];
+                            if (playlist) {
+                                apply(playlist, el);
+                            }
+                        });
+                    }
+
+                    each('.playlistName', function (p, el) { p.Name = el.value; });
+                    each('.playlistEnabled', function (p, el) { p.Enabled = el.checked; });
+                    each('.playlistMatch', function (p, el) { p.Match = el.value; });
+                    each('.playlistEpisodes', function (p, el) { p.EpisodesPerSeries = parseInt(el.value, 10) || 1; });
+                    each('.playlistMax', function (p, el) { p.MaxItems = parseInt(el.value, 10) || 0; });
+                    each('.playlistSort', function (p, el) { p.SortOrder = el.value; });
+                    each('.playlistSpecials', function (p, el) { p.IncludeSpecials = el.checked; });
+                    each('.playlistUnaired', function (p, el) { p.IncludeUnairedEpisodes = el.checked; });
+                    each('.playlistPublic', function (p, el) { p.MakePublic = el.checked; });
+                    each('.playlistUsers', function (p, el) { p.UserIds = selectedValues(el); });
+
+                    each('.ruleField', function (p, el) {
+                        p.Rules[parseInt(el.getAttribute('data-rule'), 10)].Field = el.value;
+                    });
+                    each('.ruleOperator', function (p, el) {
+                        p.Rules[parseInt(el.getAttribute('data-rule'), 10)].Operator = el.value;
+                    });
+                    each('.ruleValue', function (p, el) {
+                        p.Rules[parseInt(el.getAttribute('data-rule'), 10)].Value = el.value;
+                    });
+
+                    state.config.UserIds = selectedValues(page.querySelector('#GlobalUserIds'));
+                }
+
+                function bind(page) {
+                    Array.prototype.forEach.call(page.querySelectorAll('.addRule'), function (button) {
+                        button.addEventListener('click', function () {
+                            var index = parseInt(this.getAttribute('data-playlist'), 10);
+                            syncFromDom();
+                            state.config.Playlists[index].Rules.push({
+                                Field: 'Genre', Operator: 'Is', Value: ''
+                            });
+                            render();
+                        });
+                    });
+
+                    Array.prototype.forEach.call(page.querySelectorAll('.removeRule'), function (button) {
+                        button.addEventListener('click', function () {
+                            var playlistIndex = parseInt(this.getAttribute('data-playlist'), 10);
+                            var ruleIndex = parseInt(this.getAttribute('data-rule'), 10);
+                            syncFromDom();
+                            state.config.Playlists[playlistIndex].Rules.splice(ruleIndex, 1);
+                            render();
+                        });
+                    });
+
+                    Array.prototype.forEach.call(page.querySelectorAll('.removePlaylist'), function (button) {
+                        button.addEventListener('click', function () {
+                            var index = parseInt(this.getAttribute('data-playlist'), 10);
+                            var name = state.config.Playlists[index].Name;
+                            syncFromDom();
+                            state.config.Playlists.splice(index, 1);
+                            render();
+                            Dashboard.alert('Removed "' + name + '". The playlist itself is left in your library; delete it there if you no longer want it.');
+                        });
+                    });
+
+                    // Changing the field can invalidate the operator and the value control.
+                    Array.prototype.forEach.call(page.querySelectorAll('.ruleField'), function (select) {
+                        select.addEventListener('change', function () {
+                            syncFromDom();
+                            render();
+                        });
+                    });
+                }
+
+                function load() {
                     Dashboard.showLoadingMsg();
-                    loadConfig(page).then(function () {
+                    return Promise.all([
+                        ApiClient.getPluginConfiguration(PLUGIN_ID),
+                        ApiClient.getUsers()
+                    ]).then(function (responses) {
+                        state.config = responses[0];
+                        state.users = responses[1];
+                        state.config.Playlists = state.config.Playlists || [];
+                        state.config.UserIds = state.config.UserIds || [];
+                        render();
                         Dashboard.hideLoadingMsg();
                     });
-                });
+                }
 
-            document.querySelector('#SmartFavoritesConfigForm')
-                .addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    var page = document.querySelector('#SmartFavoritesConfigPage');
-                    Dashboard.showLoadingMsg();
+                document.querySelector('#SmartFavoritesConfigPage')
+                    .addEventListener('pageshow', function () { load(); });
 
-                    ApiClient.getPluginConfiguration(SmartFavoritesConfig.pluginUniqueId).then(function (config) {
-                        config.PlaylistName = page.querySelector('#PlaylistName').value;
-                        config.EpisodesPerSeries = parseInt(page.querySelector('#EpisodesPerSeries').value, 10) || 1;
-                        config.SortOrder = page.querySelector('#SortOrder').value;
-                        config.IncludeSpecials = page.querySelector('#IncludeSpecials').checked;
-                        config.IncludeUnairedEpisodes = page.querySelector('#IncludeUnairedEpisodes').checked;
-                        config.MakePlaylistPublic = page.querySelector('#MakePlaylistPublic').checked;
-                        config.UserIds = Array.prototype.map.call(
-                            page.querySelectorAll('#UserIds option:checked'),
-                            function (option) { return option.value; });
-
-                        ApiClient.updatePluginConfiguration(SmartFavoritesConfig.pluginUniqueId, config).then(function (result) {
-                            Dashboard.processPluginConfigurationUpdateResult(result);
-                        });
+                document.querySelector('#AddPlaylist').addEventListener('click', function () {
+                    syncFromDom();
+                    state.config.Playlists.push({
+                        Name: 'New playlist',
+                        Enabled: true,
+                        Match: 'All',
+                        Rules: [{ Field: 'IsFavorite', Operator: 'Is', Value: 'true' }],
+                        EpisodesPerSeries: 1,
+                        MaxItems: 0,
+                        SortOrder: 'LastWatched',
+                        IncludeSpecials: false,
+                        IncludeUnairedEpisodes: false,
+                        MakePublic: false,
+                        UserIds: []
                     });
-
-                    return false;
+                    render();
                 });
 
-            document.querySelector('#RefreshNow')
-                .addEventListener('click', function () {
+                document.querySelector('#Save').addEventListener('click', function () {
+                    syncFromDom();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.updatePluginConfiguration(PLUGIN_ID, state.config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    });
+                });
+
+                document.querySelector('#RefreshNow').addEventListener('click', function () {
                     Dashboard.showLoadingMsg();
                     ApiClient.getScheduledTasks().then(function (tasks) {
-                        var task = tasks.filter(function (t) { return t.Key === SmartFavoritesConfig.taskKey; })[0];
+                        var task = tasks.filter(function (t) { return t.Key === TASK_KEY; })[0];
                         if (!task) {
                             Dashboard.hideLoadingMsg();
                             Dashboard.alert('Could not find the Smart Favorites refresh task.');
                             return;
                         }
-
                         ApiClient.startScheduledTask(task.Id).then(function () {
                             Dashboard.hideLoadingMsg();
                             Dashboard.alert('Refreshing playlists in the background.');
                         });
                     });
                 });
+            })();
         </script>
     </div>
 </body>

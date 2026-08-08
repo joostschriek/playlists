@@ -23,6 +23,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+
+        // Carries a pre-1.1 single-playlist config forward, and gives a fresh install the
+        // favorites playlist the plugin has always produced.
+        if (Configuration.EnsureDefaultPlaylist())
+        {
+            SaveConfiguration();
+        }
     }
 
     /// <inheritdoc />

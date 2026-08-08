@@ -20,7 +20,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SmartFavorites;
 
 /// <summary>
-/// Rebuilds the "up next" playlist for a user from the series they have favorited.
+/// Rebuilds each configured smart playlist from the series that satisfy its rules.
 /// </summary>
 public sealed class SmartFavoritesPlaylistBuilder : IDisposable
 {
@@ -57,29 +57,32 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         Plugin.Instance?.Configuration ?? new PluginConfiguration();
 
     /// <summary>
-    /// Gets the users the plugin is configured to maintain a playlist for.
+    /// Gets the users the plugin is configured to maintain playlists for.
     /// </summary>
     /// <returns>The users to build playlists for.</returns>
     public IReadOnlyList<User> GetTargetUsers()
     {
-        var configured = Configuration.UserIds;
         var users = _userManager.GetUsers().ToList();
+        var allowed = ParseUserIds(Configuration.UserIds);
 
-        if (configured.Length == 0)
+        return allowed.Count == 0 ? users : users.Where(u => allowed.Contains(u.Id)).ToList();
+    }
+
+    private static HashSet<Guid> ParseUserIds(string[]? ids)
+    {
+        if (ids is null)
         {
-            return users;
+            return [];
         }
 
-        var allowed = configured
+        return ids
             .Select(id => Guid.TryParse(id, out var parsed) ? parsed : Guid.Empty)
             .Where(id => !id.Equals(Guid.Empty))
             .ToHashSet();
-
-        return users.Where(u => allowed.Contains(u.Id)).ToList();
     }
 
     /// <summary>
-    /// Rebuilds the playlist for every configured user.
+    /// Rebuilds every playlist for every configured user.
     /// </summary>
     /// <param name="progress">Progress reporter.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
@@ -99,19 +102,48 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
     }
 
     /// <summary>
-    /// Rebuilds the playlist for a single user.
+    /// Rebuilds every playlist that applies to a single user.
     /// </summary>
     /// <param name="user">The user.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public async Task BuildForUserAsync(User user, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(user);
+
         await _buildLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var config = Configuration;
-            var episodeIds = CollectEpisodes(user, config);
-            await SyncPlaylistAsync(user, episodeIds, config).ConfigureAwait(false);
+            var definitions = Configuration.Playlists
+                .Where(d => d.Enabled && AppliesTo(d, user))
+                .ToList();
+
+            if (definitions.Count == 0)
+            {
+                return;
+            }
+
+            // Every playlist filters the same set of series, so load and annotate it once.
+            var facts = LoadSeriesFacts(user, definitions);
+
+            foreach (var definition in definitions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var episodeIds = CollectEpisodes(user, definition, facts);
+                    await SyncPlaylistAsync(user, definition, episodeIds).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to build playlist {PlaylistName} for {Username}", definition.Name, user.Username);
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -119,7 +151,7 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to build the favorites playlist for {Username}", user.Username);
+            _logger.LogError(ex, "Failed to build playlists for {Username}", user.Username);
         }
         finally
         {
@@ -127,57 +159,120 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         }
     }
 
-    private List<Guid> CollectEpisodes(User user, PluginConfiguration config)
+    private static bool AppliesTo(SmartPlaylistDefinition definition, User user)
     {
-        var favorites = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        var allowed = ParseUserIds(definition.UserIds);
+        return allowed.Count == 0 || allowed.Contains(user.Id);
+    }
+
+    /// <summary>
+    /// Loads the candidate series and the user-data each rule set needs. When every enabled
+    /// playlist requires a favorite, the filter is pushed into the query so large libraries
+    /// are not enumerated in full.
+    /// </summary>
+    private List<SeriesFacts> LoadSeriesFacts(User user, IReadOnlyList<SmartPlaylistDefinition> definitions)
+    {
+        var query = new InternalItemsQuery(user)
         {
             IncludeItemTypes = [BaseItemKind.Series],
-            IsFavorite = true,
             Recursive = true,
             DtoOptions = new DtoOptions(false)
-        }).OfType<Series>().ToList();
+        };
 
-        _logger.LogDebug("Found {Count} favorited series for {Username}", favorites.Count, user.Username);
-
-        var take = Math.Max(1, config.EpisodesPerSeries);
-        var entries = new List<(Series Series, DateTime? LastWatched, IReadOnlyList<Episode> Episodes)>();
-
-        foreach (var series in favorites)
+        if (definitions.All(RequiresFavorite))
         {
-            var episodes = GetNextUnwatchedEpisodes(user, series, config, take);
-            if (episodes.Count == 0)
+            query.IsFavorite = true;
+        }
+
+        var series = _libraryManager.GetItemList(query).OfType<Series>().ToList();
+        _logger.LogDebug("Evaluating {Count} series for {Username}", series.Count, user.Username);
+
+        var needsLastWatched = definitions.Any(d =>
+            d.SortOrder == PlaylistSortOrder.LastWatched
+            || d.Rules.Any(r => r.Field == RuleField.DaysSinceLastWatched));
+
+        var facts = new List<SeriesFacts>(series.Count);
+        foreach (var item in series)
+        {
+            var isFavorite = _userDataManager.GetUserData(user, item)?.IsFavorite ?? false;
+            var lastWatched = needsLastWatched ? GetLastWatchedDate(user, item) : null;
+            facts.Add(new SeriesFacts(item, isFavorite, lastWatched));
+        }
+
+        return facts;
+    }
+
+    /// <summary>
+    /// Whether a definition can only ever match favorited series, which makes pushing
+    /// IsFavorite into the query safe.
+    /// </summary>
+    private static bool RequiresFavorite(SmartPlaylistDefinition definition)
+    {
+        if (definition.Rules.Count == 0 || definition.Match != MatchMode.All)
+        {
+            return false;
+        }
+
+        return definition.Rules.Any(r =>
+            r.Field == RuleField.IsFavorite
+            && r.Operator is RuleOperator.Is or RuleOperator.Contains
+            && string.Equals(r.Value?.Trim(), "true", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private List<Guid> CollectEpisodes(User user, SmartPlaylistDefinition definition, IReadOnlyList<SeriesFacts> allSeries)
+    {
+        var take = Math.Max(1, definition.EpisodesPerSeries);
+        var entries = new List<(SeriesFacts Facts, IReadOnlyList<Episode> Episodes)>();
+
+        foreach (var facts in allSeries)
+        {
+            if (!RuleEvaluator.Matches(definition, facts))
             {
                 continue;
             }
 
-            var lastWatched = config.SortOrder == PlaylistSortOrder.LastWatched
-                ? GetLastWatchedDate(user, series)
-                : null;
-
-            entries.Add((series, lastWatched, episodes));
+            var episodes = GetNextUnwatchedEpisodes(user, facts.Series, definition, take);
+            if (episodes.Count > 0)
+            {
+                entries.Add((facts, episodes));
+            }
         }
 
-        var ordered = config.SortOrder switch
+        _logger.LogDebug(
+            "{Count} series matched {PlaylistName} for {Username}",
+            entries.Count,
+            definition.Name,
+            user.Username);
+
+        var ordered = definition.SortOrder switch
         {
             PlaylistSortOrder.LastWatched => entries
-                .OrderByDescending(e => e.LastWatched.HasValue)
-                .ThenByDescending(e => e.LastWatched ?? DateTime.MinValue)
-                .ThenBy(e => e.Series.SortName, StringComparer.OrdinalIgnoreCase),
+                .OrderByDescending(e => e.Facts.LastWatchedUtc.HasValue)
+                .ThenByDescending(e => e.Facts.LastWatchedUtc ?? DateTime.MinValue)
+                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
             PlaylistSortOrder.EpisodeAirDate => entries
                 .OrderBy(e => e.Episodes[0].PremiereDate ?? DateTime.MaxValue)
-                .ThenBy(e => e.Series.SortName, StringComparer.OrdinalIgnoreCase),
+                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.RecentlyAdded => entries
+                .OrderByDescending(e => e.Facts.Series.DateCreated)
+                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.CommunityRating => entries
+                .OrderByDescending(e => e.Facts.Series.CommunityRating ?? 0)
+                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
             PlaylistSortOrder.Random => entries
                 .OrderBy(_ => Random.Shared.Next())
-                .ThenBy(e => e.Series.SortName, StringComparer.OrdinalIgnoreCase),
+                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
             _ => entries
-                .OrderBy(e => e.Series.SortName, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(e => e.Series.Id)
+                .OrderBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(e => e.Facts.Series.Id)
         };
 
-        return ordered.SelectMany(e => e.Episodes).Select(e => e.Id).ToList();
+        var ids = ordered.SelectMany(e => e.Episodes).Select(e => e.Id);
+
+        return definition.MaxItems > 0 ? ids.Take(definition.MaxItems).ToList() : ids.ToList();
     }
 
-    private List<Episode> GetNextUnwatchedEpisodes(User user, Series series, PluginConfiguration config, int take)
+    private List<Episode> GetNextUnwatchedEpisodes(User user, Series series, SmartPlaylistDefinition definition, int take)
     {
         var query = new InternalItemsQuery(user)
         {
@@ -194,19 +289,19 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             DtoOptions = new DtoOptions(false)
         };
 
-        if (!config.IncludeSpecials)
+        if (!definition.IncludeSpecials)
         {
             query.ParentIndexNumberNotEquals = 0;
         }
 
-        if (config.IncludeUnairedEpisodes)
+        if (definition.IncludeUnairedEpisodes)
         {
             query.Limit = take;
         }
 
         var episodes = _libraryManager.GetItemList(query).OfType<Episode>();
 
-        if (!config.IncludeUnairedEpisodes)
+        if (!definition.IncludeUnairedEpisodes)
         {
             var now = DateTime.UtcNow;
             episodes = episodes.Where(e => !e.PremiereDate.HasValue || e.PremiereDate.Value <= now);
@@ -231,9 +326,9 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         return lastPlayed.Count == 0 ? null : _userDataManager.GetUserData(user, lastPlayed[0])?.LastPlayedDate;
     }
 
-    private async Task SyncPlaylistAsync(User user, List<Guid> episodeIds, PluginConfiguration config)
+    private async Task SyncPlaylistAsync(User user, SmartPlaylistDefinition definition, List<Guid> episodeIds)
     {
-        var name = string.IsNullOrWhiteSpace(config.PlaylistName) ? "Favorites Up Next" : config.PlaylistName.Trim();
+        var name = string.IsNullOrWhiteSpace(definition.Name) ? "Up Next" : definition.Name.Trim();
 
         var existing = _playlistManager.GetPlaylists(user.Id)
             .FirstOrDefault(p => p.OwnerUserId.Equals(user.Id)
@@ -243,7 +338,7 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         {
             if (episodeIds.Count == 0)
             {
-                _logger.LogDebug("No unwatched episodes for {Username}, not creating a playlist", user.Username);
+                _logger.LogDebug("Nothing matched {PlaylistName} for {Username}, not creating a playlist", name, user.Username);
                 return;
             }
 
@@ -253,7 +348,7 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
                 ItemIdList = episodeIds,
                 UserId = user.Id,
                 MediaType = MediaType.Video,
-                Public = config.MakePlaylistPublic
+                Public = definition.MakePublic
             }).ConfigureAwait(false);
 
             _logger.LogInformation("Created playlist {PlaylistName} for {Username} with {Count} episodes", name, user.Username, episodeIds.Count);

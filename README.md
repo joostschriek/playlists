@@ -14,6 +14,34 @@ For every user, the plugin:
 
 Series with nothing left unwatched are skipped, so the playlist is only ever a list of things you can actually watch.
 
+## Filters
+
+Each playlist is defined by a set of rules, in the style of a Plex smart playlist. A series contributes episodes when it satisfies **all** of the rules, or **any** of them, depending on the playlist's match mode. No rules means every series qualifies.
+
+| Field | Type | Example |
+| --- | --- | --- |
+| Favorited | yes/no | `Favorited is yes` — the original behaviour |
+| Genre, Studio, Tag | text, multi-valued | `Genre is Comedy` |
+| Series name | text | `Series name contains Star` |
+| Content rating | text | `Content rating is TV-MA` |
+| Status | Continuing / Ended / Unreleased | `Status is Continuing` |
+| Community rating | number, 0–10 | `Community rating is greater than 8` |
+| Critic rating | number, 0–100 | `Critic rating is greater than 75` |
+| Year | number | `Year is greater than 2015` |
+| Days since added | number | `Days since added is less than 30` |
+| Days since last watched | number | `Days since last watched is less than 14` |
+
+Operators are `is`, `is not`, `contains`, `does not contain`, `is greater than` and `is less than`. The last two apply to numeric fields only.
+
+Two behaviours worth knowing:
+
+- **Negation on multi-valued fields must hold for every value.** `Genre is not Comedy` rejects a series tagged both Drama and Comedy, rather than accepting it because Drama matched.
+- **A missing value only satisfies a negative rule.** A series with no critic rating never matches `Critic rating is greater than 50`, and a series you have never watched never matches a `Days since last watched` comparison.
+
+Each playlist separately controls its episode count, total cap, sort order, specials and unaired handling, visibility, and which users it is built for.
+
+Renaming a playlist creates a new one; the previously generated playlist is left in your library untouched. The same applies when you delete a playlist from the configuration — the plugin stops maintaining it but never deletes it for you.
+
 ## When it refreshes
 
 Refreshes are event-driven. About 15 seconds after any of these, the affected user's playlist is rebuilt:

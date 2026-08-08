@@ -1,9 +1,10 @@
+using System.Collections.ObjectModel;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.SmartFavorites.Configuration;
 
 /// <summary>
-/// Determines the order in which favorited series contribute their episodes to the playlist.
+/// Determines the order in which matching series contribute their episodes to a playlist.
 /// </summary>
 public enum PlaylistSortOrder
 {
@@ -23,6 +24,16 @@ public enum PlaylistSortOrder
     EpisodeAirDate,
 
     /// <summary>
+    /// Most recently added series first.
+    /// </summary>
+    RecentlyAdded,
+
+    /// <summary>
+    /// Highest community rating first.
+    /// </summary>
+    CommunityRating,
+
+    /// <summary>
     /// Shuffled on every refresh.
     /// </summary>
     Random
@@ -38,49 +49,90 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public PluginConfiguration()
     {
+        Playlists = [];
+        UserIds = [];
         PlaylistName = "Favorites Up Next";
         EpisodesPerSeries = 1;
         IncludeSpecials = false;
         IncludeUnairedEpisodes = false;
         MakePlaylistPublic = false;
         SortOrder = PlaylistSortOrder.LastWatched;
-        UserIds = [];
     }
 
     /// <summary>
-    /// Gets or sets the name of the generated playlist. One playlist with this name is maintained per user.
+    /// Gets or sets the playlists to generate.
     /// </summary>
-    public string PlaylistName { get; set; }
+#pragma warning disable CA2227 // XML-serialized configuration, must be a settable collection.
+    public Collection<SmartPlaylistDefinition> Playlists { get; set; }
+#pragma warning restore CA2227
 
     /// <summary>
-    /// Gets or sets how many consecutive unwatched episodes to take from each favorited series.
-    /// </summary>
-    public int EpisodesPerSeries { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether episodes in season 0 are eligible.
-    /// </summary>
-    public bool IncludeSpecials { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether episodes whose premiere date is in the future are eligible.
-    /// </summary>
-    public bool IncludeUnairedEpisodes { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the generated playlists are visible to all users.
-    /// </summary>
-    public bool MakePlaylistPublic { get; set; }
-
-    /// <summary>
-    /// Gets or sets the order in which series contribute their episodes to the playlist.
-    /// </summary>
-    public PlaylistSortOrder SortOrder { get; set; }
-
-    /// <summary>
-    /// Gets or sets the users to generate playlists for. An empty list means every user on the server.
+    /// Gets or sets the users the plugin covers. An empty list means every user on the
+    /// server. Individual playlists can narrow this further.
     /// </summary>
 #pragma warning disable CA1819 // XML-serialized configuration, must be a settable array.
     public string[] UserIds { get; set; }
 #pragma warning restore CA1819
+
+    /// <summary>
+    /// Gets or sets the pre-1.1 playlist name, kept so existing configuration files still
+    /// deserialize and can be migrated into <see cref="Playlists"/>.
+    /// </summary>
+    public string PlaylistName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the pre-1.1 episode count. See <see cref="PlaylistName"/>.
+    /// </summary>
+    public int EpisodesPerSeries { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether specials were included, pre-1.1. See <see cref="PlaylistName"/>.
+    /// </summary>
+    public bool IncludeSpecials { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether unaired episodes were included, pre-1.1. See <see cref="PlaylistName"/>.
+    /// </summary>
+    public bool IncludeUnairedEpisodes { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether playlists were public, pre-1.1. See <see cref="PlaylistName"/>.
+    /// </summary>
+    public bool MakePlaylistPublic { get; set; }
+
+    /// <summary>
+    /// Gets or sets the pre-1.1 sort order. See <see cref="PlaylistName"/>.
+    /// </summary>
+    public PlaylistSortOrder SortOrder { get; set; }
+
+    /// <summary>
+    /// Seeds <see cref="Playlists"/> from the pre-1.1 settings when it is empty. A fresh
+    /// install lands here too, and gets the same favorites playlist the plugin has always
+    /// produced.
+    /// </summary>
+    /// <returns><c>true</c> when a playlist was added and the configuration should be saved.</returns>
+    public bool EnsureDefaultPlaylist()
+    {
+        if (Playlists.Count > 0)
+        {
+            return false;
+        }
+
+        Playlists.Add(new SmartPlaylistDefinition
+        {
+            Name = string.IsNullOrWhiteSpace(PlaylistName) ? "Favorites Up Next" : PlaylistName,
+            Match = MatchMode.All,
+            Rules =
+            [
+                new FilterRule { Field = RuleField.IsFavorite, Operator = RuleOperator.Is, Value = "true" }
+            ],
+            EpisodesPerSeries = EpisodesPerSeries,
+            SortOrder = SortOrder,
+            IncludeSpecials = IncludeSpecials,
+            IncludeUnairedEpisodes = IncludeUnairedEpisodes,
+            MakePublic = MakePlaylistPublic
+        });
+
+        return true;
+    }
 }
