@@ -38,7 +38,21 @@ Two behaviours worth knowing:
 - **Negation on multi-valued fields must hold for every value.** `Genre is not Comedy` rejects a series tagged both Drama and Comedy, rather than accepting it because Drama matched.
 - **A missing value only satisfies a negative rule.** A series with no critic rating never matches `Critic rating is greater than 50`, and a series you have never watched never matches a `Days since last watched` comparison.
 
-Each playlist separately controls its episode count, total cap, sort order, specials and unaired handling, visibility, and which users it is built for.
+Each playlist separately controls its episode count, total cap, sort order and direction, specials and unaired handling, visibility, and which users it is built for.
+
+## Sorting
+
+Pick a field to order series by, and a direction. Leaving direction on **Default** uses whichever way round reads as natural for that field:
+
+| Order by | Default direction |
+| --- | --- |
+| Last watched | Newest first |
+| Episode air date | Oldest first |
+| Date added | Newest first |
+| Community rating | Highest first |
+| Series name | A to Z |
+
+Set it to **Ascending** or **Descending** to override. Series with no value for the chosen field — no air date, no rating, never watched — sort to the end in *both* directions, so reversing the order does not drag everything unrated to the top.
 
 Renaming a playlist creates a new one; the previously generated playlist is left in your library untouched. The same applies when you delete a playlist from the configuration — the plugin stops maintaining it but never deletes it for you.
 

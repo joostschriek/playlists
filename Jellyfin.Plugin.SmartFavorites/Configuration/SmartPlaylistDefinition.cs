@@ -21,6 +21,7 @@ public class SmartPlaylistDefinition
         EpisodesPerSeries = 1;
         MaxItems = 0;
         SortOrder = PlaylistSortOrder.LastWatched;
+        SortDirection = SortDirection.Default;
         IncludeSpecials = false;
         IncludeUnairedEpisodes = false;
         MakePublic = false;
@@ -64,6 +65,11 @@ public class SmartPlaylistDefinition
     /// Gets or sets the order in which series contribute their episodes.
     /// </summary>
     public PlaylistSortOrder SortOrder { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether <see cref="SortOrder"/> runs ascending or descending.
+    /// </summary>
+    public SortDirection SortDirection { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether episodes in season 0 are eligible.

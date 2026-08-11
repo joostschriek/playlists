@@ -244,32 +244,67 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             definition.Name,
             user.Username);
 
+        var descending = IsDescending(definition);
+
         var ordered = definition.SortOrder switch
         {
-            PlaylistSortOrder.LastWatched => entries
-                .OrderByDescending(e => e.Facts.LastWatchedUtc.HasValue)
-                .ThenByDescending(e => e.Facts.LastWatchedUtc ?? DateTime.MinValue)
-                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
-            PlaylistSortOrder.EpisodeAirDate => entries
-                .OrderBy(e => e.Episodes[0].PremiereDate ?? DateTime.MaxValue)
-                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
-            PlaylistSortOrder.RecentlyAdded => entries
-                .OrderByDescending(e => e.Facts.Series.DateCreated)
-                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
-            PlaylistSortOrder.CommunityRating => entries
-                .OrderByDescending(e => e.Facts.Series.CommunityRating ?? 0)
-                .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.LastWatched =>
+                SortByValue(entries, e => e.Facts.LastWatchedUtc, descending)
+                    .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.EpisodeAirDate =>
+                SortByValue(entries, e => e.Episodes[0].PremiereDate, descending)
+                    .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.RecentlyAdded =>
+                SortByValue(entries, e => (DateTime?)e.Facts.Series.DateCreated, descending)
+                    .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
+            PlaylistSortOrder.CommunityRating =>
+                SortByValue(entries, e => e.Facts.Series.CommunityRating, descending)
+                    .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
             PlaylistSortOrder.Random => entries
                 .OrderBy(_ => Random.Shared.Next())
                 .ThenBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase),
-            _ => entries
-                .OrderBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase)
+            _ => (descending
+                    ? entries.OrderByDescending(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase)
+                    : entries.OrderBy(e => e.Facts.Series.SortName, StringComparer.OrdinalIgnoreCase))
                 .ThenBy(e => e.Facts.Series.Id)
         };
 
         var ids = ordered.SelectMany(e => e.Episodes).Select(e => e.Id);
 
         return definition.MaxItems > 0 ? ids.Take(definition.MaxItems).ToList() : ids.ToList();
+    }
+
+    /// <summary>
+    /// Resolves <see cref="SortDirection.Default"/> to whichever direction reads as natural
+    /// for the field, which is what the playlist did before the direction was configurable.
+    /// </summary>
+    private static bool IsDescending(SmartPlaylistDefinition definition)
+    {
+        return definition.SortDirection switch
+        {
+            SortDirection.Ascending => false,
+            SortDirection.Descending => true,
+            _ => definition.SortOrder is PlaylistSortOrder.LastWatched
+                or PlaylistSortOrder.RecentlyAdded
+                or PlaylistSortOrder.CommunityRating
+        };
+    }
+
+    /// <summary>
+    /// Sorts on a value that may be missing, keeping series without one at the end in both
+    /// directions — reversing the sort should not promote everything unrated to the top.
+    /// </summary>
+    private static IOrderedEnumerable<TEntry> SortByValue<TEntry, TKey>(
+        List<TEntry> entries,
+        Func<TEntry, TKey?> key,
+        bool descending)
+        where TKey : struct
+    {
+        var present = entries.OrderByDescending(e => key(e).HasValue);
+
+        return descending
+            ? present.ThenByDescending(e => key(e) ?? default)
+            : present.ThenBy(e => key(e) ?? default);
     }
 
     private List<Episode> GetNextUnwatchedEpisodes(User user, Series series, SmartPlaylistDefinition definition, int take)

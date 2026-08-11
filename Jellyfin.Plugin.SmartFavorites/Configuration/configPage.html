@@ -79,13 +79,32 @@
                 };
 
                 var SORT_ORDERS = [
-                    { value: 'LastWatched', label: 'Recently watched first' },
+                    { value: 'LastWatched', label: 'Last watched' },
                     { value: 'SeriesName', label: 'Series name' },
                     { value: 'EpisodeAirDate', label: 'Episode air date' },
-                    { value: 'RecentlyAdded', label: 'Recently added first' },
-                    { value: 'CommunityRating', label: 'Highest rated first' },
+                    { value: 'RecentlyAdded', label: 'Date added' },
+                    { value: 'CommunityRating', label: 'Community rating' },
                     { value: 'Random', label: 'Random' }
                 ];
+
+                // What "Default" resolves to per field, mirrored from the server so the
+                // dropdown can say which way it will actually sort.
+                var NATURAL_DIRECTION = {
+                    LastWatched: 'newest first',
+                    SeriesName: 'A to Z',
+                    EpisodeAirDate: 'oldest first',
+                    RecentlyAdded: 'newest first',
+                    CommunityRating: 'highest first',
+                    Random: 'shuffled'
+                };
+
+                var DIRECTION_LABELS = {
+                    LastWatched: ['Oldest first', 'Newest first'],
+                    SeriesName: ['A to Z', 'Z to A'],
+                    EpisodeAirDate: ['Oldest first', 'Newest first'],
+                    RecentlyAdded: ['Oldest first', 'Newest first'],
+                    CommunityRating: ['Lowest first', 'Highest first']
+                };
 
                 var state = { config: null, users: [] };
 
@@ -179,6 +198,27 @@
                         '</div>';
                 }
 
+                function directionControl(playlist, index) {
+                    // Random has no meaningful direction.
+                    if (playlist.SortOrder === 'Random') {
+                        return '';
+                    }
+
+                    var labels = DIRECTION_LABELS[playlist.SortOrder] || ['Ascending', 'Descending'];
+                    var natural = NATURAL_DIRECTION[playlist.SortOrder] || 'field default';
+
+                    return '<div class="selectContainer">' +
+                        '<label class="selectLabel">Direction</label>' +
+                        '<select is="emby-select" class="playlistDirection" data-playlist="' + index + '">' +
+                            options(['Default', 'Ascending', 'Descending'], playlist.SortDirection || 'Default',
+                                function (v) {
+                                    if (v === 'Default') { return 'Default (' + natural + ')'; }
+                                    return v === 'Ascending' ? labels[0] : labels[1];
+                                }) +
+                        '</select>' +
+                        '</div>';
+                }
+
                 function renderPlaylist(playlist, index) {
                     var rules = playlist.Rules || [];
                     var rulesHtml = rules.length
@@ -244,6 +284,7 @@
                                 }) +
                             '</select>' +
                         '</div>' +
+                        directionControl(playlist, index) +
 
                         '<div class="checkboxContainer">' +
                             '<label class="emby-checkbox-label">' +
@@ -317,6 +358,7 @@
                     each('.playlistEpisodes', function (p, el) { p.EpisodesPerSeries = parseInt(el.value, 10) || 1; });
                     each('.playlistMax', function (p, el) { p.MaxItems = parseInt(el.value, 10) || 0; });
                     each('.playlistSort', function (p, el) { p.SortOrder = el.value; });
+                    each('.playlistDirection', function (p, el) { p.SortDirection = el.value; });
                     each('.playlistSpecials', function (p, el) { p.IncludeSpecials = el.checked; });
                     each('.playlistUnaired', function (p, el) { p.IncludeUnairedEpisodes = el.checked; });
                     each('.playlistPublic', function (p, el) { p.MakePublic = el.checked; });
@@ -375,6 +417,14 @@
                             render();
                         });
                     });
+
+                    // The direction labels are per-field, and Random has none at all.
+                    Array.prototype.forEach.call(page.querySelectorAll('.playlistSort'), function (select) {
+                        select.addEventListener('change', function () {
+                            syncFromDom();
+                            render();
+                        });
+                    });
                 }
 
                 function load() {
@@ -405,6 +455,7 @@
                         EpisodesPerSeries: 1,
                         MaxItems: 0,
                         SortOrder: 'LastWatched',
+                        SortDirection: 'Default',
                         IncludeSpecials: false,
                         IncludeUnairedEpisodes: false,
                         MakePublic: false,

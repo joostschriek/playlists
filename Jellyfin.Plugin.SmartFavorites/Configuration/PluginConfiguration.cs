@@ -40,6 +40,29 @@ public enum PlaylistSortOrder
 }
 
 /// <summary>
+/// The direction a playlist's sort is applied in.
+/// </summary>
+public enum SortDirection
+{
+    /// <summary>
+    /// Whatever reads as natural for the chosen field: newest first for dates and highest
+    /// first for ratings, oldest first for air date, A to Z for names. Existing
+    /// configurations deserialize to this, so upgrading changes nothing.
+    /// </summary>
+    Default,
+
+    /// <summary>
+    /// Oldest, lowest or A-to-Z first.
+    /// </summary>
+    Ascending,
+
+    /// <summary>
+    /// Newest, highest or Z-to-A first.
+    /// </summary>
+    Descending
+}
+
+/// <summary>
 /// Plugin configuration.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
