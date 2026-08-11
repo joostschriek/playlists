@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.2.0.0",
+        "changelog": "Sort direction is now configurable per playlist (Default, Ascending, Descending). Series with no value for the sort field stay at the end in both directions. Release workflow is restricted to master.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v1.2.0.0/smart-favorites_1.2.0.0.zip",
+        "checksum": "08c01f4692c8af3c46302d8013cf3063",
+        "timestamp": "2026-08-11T19:37:59Z"
+      },
+      {
         "version": "1.1.0.0",
         "changelog": "Rule-based playlist filters. Define any number of playlists, each matching series on favorited status, genre, studio, tag, name, content rating, series status, community/critic rating, year, days since added, or days since last watched. Existing configurations migrate automatically.",
         "targetAbi": "10.11.0.0",
