@@ -184,7 +184,10 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         }
 
         var series = _libraryManager.GetItemList(query).OfType<Series>().ToList();
-        _logger.LogDebug("Evaluating {Count} series for {Username}", series.Count, user.Username);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug("Evaluating {Count} series for {Username}", series.Count, user.Username);
+        }
 
         var needsLastWatched = definitions.Any(d =>
             d.SortOrder == PlaylistSortOrder.LastWatched
@@ -237,11 +240,14 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             }
         }
 
-        _logger.LogDebug(
-            "{Count} series matched {PlaylistName} for {Username}",
-            entries.Count,
-            definition.Name,
-            user.Username);
+        if (_logger.IsEnabled(LogLevel.Debug))
+        {
+            _logger.LogDebug(
+                "{Count} series matched {PlaylistName} for {Username}",
+                entries.Count,
+                definition.Name,
+                user.Username);
+        }
 
         var descending = IsDescending(definition);
 
@@ -384,7 +390,11 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         {
             if (episodeIds.Count == 0)
             {
-                _logger.LogDebug("Nothing matched {PlaylistName} for {Username}, not creating a playlist", name, user.Username);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Nothing matched {PlaylistName} for {Username}, not creating a playlist", name, user.Username);
+                }
+
                 return;
             }
 
@@ -397,7 +407,11 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
                 Public = definition.MakePublic
             }).ConfigureAwait(false);
 
-            _logger.LogInformation("Created playlist {PlaylistName} for {Username} with {Count} episodes", name, user.Username, episodeIds.Count);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Created playlist {PlaylistName} for {Username} with {Count} episodes", name, user.Username, episodeIds.Count);
+            }
+
             return;
         }
 
@@ -413,7 +427,11 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
 
         if (current.SequenceEqual(episodeIds))
         {
-            _logger.LogDebug("Playlist {PlaylistName} for {Username} is already up to date", name, user.Username);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Playlist {PlaylistName} for {Username} is already up to date", name, user.Username);
+            }
+
             return;
         }
 
@@ -428,13 +446,16 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             Ids = episodeIds
         }).ConfigureAwait(false);
 
-        var dropped = current.Except(episodeIds).Count();
-        _logger.LogInformation(
-            "Refreshed playlist {PlaylistName} for {Username}: {Count} episodes ({Dropped} no longer eligible)",
-            name,
-            user.Username,
-            episodeIds.Count,
-            dropped);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            var dropped = current.Except(episodeIds).Count();
+            _logger.LogInformation(
+                "Refreshed playlist {PlaylistName} for {Username}: {Count} episodes ({Dropped} no longer eligible)",
+                name,
+                user.Username,
+                episodeIds.Count,
+                dropped);
+        }
     }
 
     /// <inheritdoc />
