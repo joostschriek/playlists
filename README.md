@@ -83,7 +83,12 @@ The scheduled task is only a backstop for changes made while the server was down
 
 ## Requirements
 
-- Jellyfin **10.11.x** (`targetAbi 10.11.0.0`, .NET 9)
+- Jellyfin **12.0 or newer** (`targetAbi 12.0.0.0`, .NET 10)
+
+Servers on 10.11.x stay on the 1.2.1.0 release. Jellyfin filters the manifest by
+`targetAbi`, so a 10.11 server simply never sees the 2.x versions and keeps running
+the last build that targeted it — nothing breaks, it just stops receiving updates
+until the server is upgraded.
 
 ## Building
 
@@ -109,7 +114,7 @@ Then **Dashboard → Plugins → Catalog → Smart Favorites → Install**, and 
 Copy `publish/Jellyfin.Plugin.SmartFavorites.dll` into a new folder under your Jellyfin plugin directory, named `<PluginName>_<Version>`:
 
 ```
-<jellyfin-config>/plugins/Smart Favorites_1.0.0.0/Jellyfin.Plugin.SmartFavorites.dll
+<jellyfin-config>/plugins/Smart Favorites_2.0.0.0/Jellyfin.Plugin.SmartFavorites.dll
 ```
 
 Restart Jellyfin. The plugin appears under **Dashboard → Plugins → Smart Favorites**.
