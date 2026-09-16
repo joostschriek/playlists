@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.0.0.0",
+        "changelog": "Targets Jellyfin 12 and .NET 10. No functional changes from 1.2.1.0 \u2014 the plugin's API surface is unchanged between 10.11 and 12.x. Servers on 10.11.x are unaffected and stay on 1.2.1.0.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v2.0.0.0/smart-favorites_2.0.0.0.zip",
+        "checksum": "01eb2437496cf44c5ab757d0ed3fb424",
+        "timestamp": "2026-09-16T18:14:36Z"
+      },
+      {
         "version": "1.2.1.0",
         "changelog": "Fixes watched episodes surviving a refresh. Playlist contents are now replaced outright via UpdatePlaylist instead of remove-then-add, and the up-to-date check reads the stored playlist rather than a possibly stale copy. Duplicate playlist names are now logged.",
         "targetAbi": "10.11.0.0",
