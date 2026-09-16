@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.2.1.0",
+        "changelog": "Fixes watched episodes surviving a refresh. Playlist contents are now replaced outright via UpdatePlaylist instead of remove-then-add, and the up-to-date check reads the stored playlist rather than a possibly stale copy. Duplicate playlist names are now logged.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v1.2.1.0/smart-favorites_1.2.1.0.zip",
+        "checksum": "405785aa90b8abb97d51337d53d34634",
+        "timestamp": "2026-09-16T17:40:11Z"
+      },
+      {
         "version": "1.2.0.0",
         "changelog": "Sort direction is now configurable per playlist (Default, Ascending, Descending). Series with no value for the sort field stay at the end in both directions. Release workflow is restricted to master.",
         "targetAbi": "10.11.0.0",
