@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -365,9 +364,21 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
     {
         var name = string.IsNullOrWhiteSpace(definition.Name) ? "Up Next" : definition.Name.Trim();
 
-        var existing = _playlistManager.GetPlaylists(user.Id)
-            .FirstOrDefault(p => p.OwnerUserId.Equals(user.Id)
-                && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        var owned = _playlistManager.GetPlaylists(user.Id)
+            .Where(p => p.OwnerUserId.Equals(user.Id)
+                && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (owned.Count > 1)
+        {
+            _logger.LogWarning(
+                "{Count} playlists named {PlaylistName} belong to {Username}. Only the first is maintained; rename or delete the others.",
+                owned.Count,
+                name,
+                user.Username);
+        }
+
+        var existing = owned.FirstOrDefault();
 
         if (existing is null)
         {
@@ -390,7 +401,11 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             return;
         }
 
-        var current = existing.LinkedChildren
+        // Read the stored playlist rather than trusting the listing above, which can hand
+        // back an instance whose children lag what is on disk. Deciding "already up to
+        // date" from a stale copy is how a watched episode survives a refresh.
+        var stored = _libraryManager.GetItemById(existing.Id) as Playlist ?? existing;
+        var current = stored.LinkedChildren
             .Select(c => c.ItemId)
             .Where(id => id.HasValue)
             .Select(id => id!.Value)
@@ -402,21 +417,24 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             return;
         }
 
-        var playlistId = existing.Id.ToString("N", CultureInfo.InvariantCulture);
-
-        if (current.Count > 0)
+        // Replace the contents outright. UpdatePlaylist clears LinkedChildren server-side
+        // and re-adds, so an episode that is no longer eligible cannot survive; the former
+        // remove-then-add pass relied on entry matching and left stale items behind when it
+        // did not line up.
+        await _playlistManager.UpdatePlaylist(new PlaylistUpdateRequest
         {
-            await _playlistManager.RemoveItemFromPlaylistAsync(
-                playlistId,
-                current.Select(id => id.ToString("N", CultureInfo.InvariantCulture))).ConfigureAwait(false);
-        }
+            Id = existing.Id,
+            UserId = user.Id,
+            Ids = episodeIds
+        }).ConfigureAwait(false);
 
-        if (episodeIds.Count > 0)
-        {
-            await _playlistManager.AddItemToPlaylistAsync(existing.Id, episodeIds, user.Id).ConfigureAwait(false);
-        }
-
-        _logger.LogInformation("Refreshed playlist {PlaylistName} for {Username}: {Count} episodes", name, user.Username, episodeIds.Count);
+        var dropped = current.Except(episodeIds).Count();
+        _logger.LogInformation(
+            "Refreshed playlist {PlaylistName} for {Username}: {Count} episodes ({Dropped} no longer eligible)",
+            name,
+            user.Username,
+            episodeIds.Count,
+            dropped);
     }
 
     /// <inheritdoc />
