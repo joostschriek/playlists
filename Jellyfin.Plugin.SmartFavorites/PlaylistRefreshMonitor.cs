@@ -74,6 +74,11 @@ public sealed class PlaylistRefreshMonitor : IHostedService, IDisposable
             Plugin.Instance.ConfigurationChanged += OnConfigurationChanged;
         }
 
+        // Logged at Information so it is visible without turning on debug logging: if this
+        // line is absent from a startup log, nothing is listening and playlists will only
+        // change when the scheduled task runs.
+        _logger.LogInformation("Smart Favorites is watching for favorite, playback and library changes");
+
         return Task.CompletedTask;
     }
 
@@ -177,6 +182,11 @@ public sealed class PlaylistRefreshMonitor : IHostedService, IDisposable
             {
                 _logger.LogError(ex, "Could not resolve the users to refresh");
             }
+        }
+
+        if (!_pendingUsers.IsEmpty)
+        {
+            _logger.LogInformation("Rebuilding Smart Favorites playlists for {Count} user(s)", _pendingUsers.Count);
         }
 
         foreach (var userId in _pendingUsers.Keys)

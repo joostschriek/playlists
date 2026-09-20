@@ -347,7 +347,22 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
             episodes = episodes.Where(e => !e.PremiereDate.HasValue || e.PremiereDate.Value <= now);
         }
 
-        return episodes.Take(take).ToList();
+        var selected = episodes.Take(take).ToList();
+
+        // IsPlayed=false should make this impossible. If it ever fires, the filter is not
+        // doing what this code assumes and watched episodes are reaching the playlist from
+        // the query rather than surviving the sync.
+        var played = selected.Count(e => _userDataManager.GetUserData(user, e)?.Played == true);
+        if (played > 0)
+        {
+            _logger.LogWarning(
+                "{Count} of {Total} episodes selected for {SeriesName} are already played despite the unwatched filter",
+                played,
+                selected.Count,
+                series.Name);
+        }
+
+        return selected;
     }
 
     private DateTime? GetLastWatchedDate(User user, Series series)
@@ -390,9 +405,9 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
         {
             if (episodeIds.Count == 0)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
+                if (_logger.IsEnabled(LogLevel.Information))
                 {
-                    _logger.LogDebug("Nothing matched {PlaylistName} for {Username}, not creating a playlist", name, user.Username);
+                    _logger.LogInformation("Nothing matched {PlaylistName} for {Username}, not creating a playlist", name, user.Username);
                 }
 
                 return;
@@ -427,9 +442,13 @@ public sealed class SmartFavoritesPlaylistBuilder : IDisposable
 
         if (current.SequenceEqual(episodeIds))
         {
-            if (_logger.IsEnabled(LogLevel.Debug))
+            if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogDebug("Playlist {PlaylistName} for {Username} is already up to date", name, user.Username);
+                _logger.LogInformation(
+                    "Playlist {PlaylistName} for {Username} already matches: {Count} episodes, nothing to change",
+                    name,
+                    user.Username,
+                    episodeIds.Count);
             }
 
             return;
