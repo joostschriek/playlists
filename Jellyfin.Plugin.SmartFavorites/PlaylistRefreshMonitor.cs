@@ -184,7 +184,7 @@ public sealed class PlaylistRefreshMonitor : IHostedService, IDisposable
             }
         }
 
-        if (!_pendingUsers.IsEmpty)
+        if (!_pendingUsers.IsEmpty && _logger.IsEnabled(LogLevel.Information))
         {
             _logger.LogInformation("Rebuilding Smart Favorites playlists for {Count} user(s)", _pendingUsers.Count);
         }
