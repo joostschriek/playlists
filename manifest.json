@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.0.1.0",
+        "changelog": "Diagnostics for the watched-episode issue. Adds a startup line confirming the event subscription is live, a per-flush rebuild line, visible outcomes for the 'already matches' and 'nothing matched' paths that were previously Debug-only, and a warning if the unwatched query ever returns an already-played episode.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/joostschriek/playlists/releases/download/v2.0.1.0/smart-favorites_2.0.1.0.zip",
+        "checksum": "e363b03a0c80e1f5147b112733cbfbf3",
+        "timestamp": "2026-09-20T09:05:20Z"
+      },
+      {
         "version": "2.0.0.0",
         "changelog": "Targets Jellyfin 12 and .NET 10. No functional changes from 1.2.1.0 \u2014 the plugin's API surface is unchanged between 10.11 and 12.x. Servers on 10.11.x are unaffected and stay on 1.2.1.0.",
         "targetAbi": "12.0.0.0",
